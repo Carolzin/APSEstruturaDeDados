@@ -1,7 +1,8 @@
-
+# importanto bibliotecas 
 import pandas as pd
 import os
 
+# etapa 1: Fonte e coleta de dados (ler os dois CSVs Deter e Prodes com pandas) 
 dados_path = "../dados"
 
 deter_file = os.path.join(dados_path, "DETER_BASE_DE_ALARMES.csv")
@@ -16,3 +17,4 @@ print(deter.head(), "\n")
 
 print("Primeiras linhas do PRODES:")
 print(prodes.head())
+
