@@ -4,50 +4,50 @@ from collections import deque
 import time
 
 # -------------------------------
-# caminho e leitura do CSV
+# caminho do CSV
 # -------------------------------
 dados_path = "../dados"
-prodes_file = os.path.join(dados_path, "PRODES_BASE_DE_DESMATAMENTO_POR_ANOS.csv")
+deter_file = os.path.join(dados_path, "DETER_BASE_DE_ALARMES.csv")
 
-prodes = pd.read_csv(prodes_file, sep=";", encoding="latin1")
-prodes = prodes.dropna(subset=["year", "state", "areakm"])
+with open(deter_file, "r", encoding="latin1") as f:
+    linhas = f.read().splitlines()
 
-#corrige caracteres especiais
-prodes["municipality"] = prodes["municipality"].apply(
-    lambda x: x.encode("latin1").decode("utf-8") if isinstance(x, str) else x
-)
-prodes["state"] = prodes["state"].apply(
-    lambda x: x.encode("latin1").decode("utf-8") if isinstance(x, str) else x
-)
+# separar cada linha pelo ";"
+dados_separados = [linha.split(";") for linha in linhas]
+
+# criar DataFrame
+deter = pd.DataFrame(dados_separados, columns=["year", "month", "area", "uf", "className", "numPol"])
+
+# remove espaços extras
+deter = deter.apply(lambda x: x.str.strip() if x.dtype == "object" else x)
+
+# converte colunas numéricas
+deter["area"] = pd.to_numeric(deter["area"], errors="coerce")
+deter["month"] = pd.to_numeric(deter["month"], errors="coerce")
+deter["numPol"] = pd.to_numeric(deter["numPol"], errors="coerce")
+
+# remove linhas com valores ausentes
+deter = deter.dropna(subset=["year", "uf", "area"])
 
 # -------------------------------
-# NAO ESQUECER DE AJUSTAR A COLUNA AREA KM QUE TA COM ERRO DE CONVERSÃO
-# -------------------------------
-
-
-# -------------------------------
-#salvar CSV tratado completo
+# salvar CSV tratado completo
 # -------------------------------
 os.makedirs("../resultados", exist_ok=True)
-saida_path = "../resultados/prodes_tratado_completo.csv"
-prodes.to_csv(saida_path, sep=";", index=False, encoding="utf-8-sig")
+saida_path = "../resultados/deter_tratado_completo.csv"
+deter.to_csv(saida_path, sep=";", index=False, encoding="utf-8-sig")
 print(f"✅ CSV completo salvo em: {saida_path}")
 
 # -------------------------------
-#agregação por estado e ano
+# agregação por UF e ano
 # -------------------------------
-prodes_agregado = prodes.groupby(["state", "year"], as_index=False)["areakm"].sum()
-
-#salvar CSV agregado
-saida_agregado = "../resultados/prodes_agregado_estado_ano.csv"
-prodes_agregado.to_csv(saida_agregado, sep=";", index=False, encoding="utf-8-sig")
+deter_agregado = deter.groupby(["uf", "year"], as_index=False)["area"].sum()
+saida_agregado = "../resultados/deter_agregado_uf_ano.csv"
+deter_agregado.to_csv(saida_agregado, sep=";", index=False, encoding="utf-8-sig")
 print(f"✅ CSV agregado salvo em: {saida_agregado}")
 
 # -------------------------------
-#estruturas de dados
+# estruturas de dados
 # -------------------------------
-
-#pilha (LIFO)
 class Pilha:
     def __init__(self):
         self.itens = []
@@ -60,7 +60,6 @@ class Pilha:
     def tamanho(self):
         return len(self.itens)
 
-#fila (FIFO)
 class Fila:
     def __init__(self):
         self.itens = deque()
@@ -73,8 +72,7 @@ class Fila:
     def tamanho(self):
         return len(self.itens)
 
-#TAD 
-class TADProdes:
+class TADDETER:
     def __init__(self):
         self.dados = []
     def adicionar(self, registro):
@@ -85,18 +83,14 @@ class TADProdes:
         return len(self.dados)
 
 # -------------------------------
-#carregar dados agregados nas estruturas
+# carregar dados agregados nas estruturas
 # -------------------------------
 pilha = Pilha()
 fila = Fila()
-tad = TADProdes()
+tad = TADDETER()
 
-for idx, row in prodes_agregado.iterrows():
-    registro = {
-        "state": row["state"],
-        "year": row["year"],
-        "areakm": row["areakm"]
-    }
+for idx, row in deter_agregado.iterrows():
+    registro = {"uf": row["uf"], "year": row["year"], "area": row["area"]}
     pilha.push(registro)
     fila.enqueue(registro)
     tad.adicionar(registro)
@@ -106,9 +100,8 @@ print(f"Fila contém {fila.tamanho()} registros")
 print(f"TAD contém {tad.tamanho()} registros")
 
 # -------------------------------
-# Algoritmos de ordenação
+# algoritmos de ordenação
 # -------------------------------
-
 def bubble_sort(lista):
     n = len(lista)
     comparacoes = 0
@@ -116,47 +109,41 @@ def bubble_sort(lista):
     for i in range(n):
         for j in range(0, n - i - 1):
             comparacoes += 1
-            if lista[j]["areakm"] > lista[j + 1]["areakm"]:
+            if lista[j]["area"] > lista[j + 1]["area"]:
                 lista[j], lista[j + 1] = lista[j + 1], lista[j]
     fim = time.time()
     return lista, comparacoes, round(fim - inicio, 4)
 
 def quick_sort(lista):
-    comparacoes = [0]  # usa lista pra mutabilidade
-
+    comparacoes = [0]
     def _quick_sort(items):
         if len(items) <= 1:
             return items
-        pivo = items[len(items)//2]["areakm"]
-        menores = [x for x in items if x["areakm"] < pivo]
-        iguais = [x for x in items if x["areakm"] == pivo]
-        maiores = [x for x in items if x["areakm"] > pivo]
+        pivo = items[len(items)//2]["area"]
+        menores = [x for x in items if x["area"] < pivo]
+        iguais = [x for x in items if x["area"] == pivo]
+        maiores = [x for x in items if x["area"] > pivo]
         comparacoes[0] += len(items) - 1
         return _quick_sort(menores) + iguais + _quick_sort(maiores)
-
     inicio = time.time()
     ordenado = _quick_sort(lista)
     fim = time.time()
     return ordenado, comparacoes[0], round(fim - inicio, 4)
 
 # -------------------------------
-# Aplicar algoritmos ao TAD
+# aplicar algoritmos
 # -------------------------------
 dados_para_ordenar = tad.listar()
-
-# Bubble Sort
 bubble_dados, bubble_comp, bubble_tempo = bubble_sort(dados_para_ordenar.copy())
-# Quick Sort
 quick_dados, quick_comp, quick_tempo = quick_sort(dados_para_ordenar.copy())
 
 # -------------------------------
-# Gerar CSV comparativo de performance
+# gerar CSV de desempenho
 # -------------------------------
 resultados = pd.DataFrame([
     {"Algoritmo": "Bubble Sort", "Comparações": bubble_comp, "Tempo (s)": bubble_tempo},
     {"Algoritmo": "Quick Sort", "Comparações": quick_comp, "Tempo (s)": quick_tempo},
 ])
-
-saida_performance = "../resultados/desempenho_algoritmos.csv"
+saida_performance = "../resultados/desempenho_algoritmos_deter.csv"
 resultados.to_csv(saida_performance, sep=";", index=False, encoding="utf-8-sig")
 print(f"✅ CSV de desempenho salvo em: {saida_performance}")
