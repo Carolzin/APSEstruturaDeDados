@@ -22,6 +22,7 @@ prodes["state"] = prodes["state"].apply(
 
 # -------------------------------
 # NAO ESQUECER DE AJUSTAR A COLUNA AREA KM QUE TA COM ERRO DE CONVERSÃO
+prodes["areakm"] = prodes["areakm"].astype(str).str.replace(",", ".").astype(float)
 # -------------------------------
 
 
